@@ -20,7 +20,7 @@ $startTitle   ||= 1;
 $titlesPerDisc ||= 4;
 
 my $saveToDir = "/mnt/tmp";
-my $jobCount = 0;
+my $jobCount = 1;
 
 my $commentaryTracks = {
     1 => {
@@ -62,12 +62,13 @@ my $series = $tvdb->getSeries($showName) or die("no series($showName): $!");
 
     my $maxEpisode = $tvdb->getMaxEpisode($showName, $startSeason);
 
-    for (my $disc = 1; $disc <= $endDisc;  $disc++)
+    DISKLOOP: for (my $disc = 1; $disc <= $endDisc;  $disc++)
     {
         my $discPath = sprintf($discFormat, $startSeason, $disc);
         print "Processing $disc - $discPath\n";
         foreach my $episode ((($disc-1)*$titlesPerDisc)+1..(($disc-1)*$titlesPerDisc)+$titlesPerDisc)
         {
+            last DISKLOOP if $episode > $maxEpisode;
             my $audio = [1];
             if (my $audioTracks = $commentaryTracks->{$startSeason}->{$episode})
             {
@@ -101,9 +102,12 @@ my $series = $tvdb->getSeries($showName) or die("no series($showName): $!");
             print "Outputting $outputFile\n";
 
             my $chapters = sprintf('%d-%d', $startChapter, $endChapter);
+            my $title = ($episode % $titlesPerDisc);
+            $title = $titlesPerDisc unless $title;
+
             $fh->print('  <Job>', "\n");
             $fh->print('    <Id>',$jobCount,'</Id>', "\n");
-            $fh->print('    <Query> -i "',$discPath,'" -t ',($episode % $titlesPerDisc)+1,' --angle 1 -c ',$chapters,
+            $fh->print('    <Query> -i "',$discPath,'" -t ',$title,' --angle 1 -c ',$chapters,
                                   ' -o "', $outputFile, '" -f mkv --strict-anamorphic  --detelecine --decomb ',
                                   $audioLine,
                                   '--subtitle scan --subtitle-forced=Foreign --subtitle-burn=scan --subtitle-default=scan ', 
