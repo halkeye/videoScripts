@@ -68,14 +68,6 @@ my $series = $tvdb->getSeries($showName) or die("no series($showName): $!");
         print "Processing $disc - $discPath\n";
         foreach my $episode ((($disc-1)*$titlesPerDisc)+1..(($disc-1)*$titlesPerDisc)+$titlesPerDisc)
         {
-            my $outputFile = sprintf(
-                    "%s\\%s - S%02dE%02d.mkv",
-                    $outputPath,
-                    $showName,
-                    $startSeason,
-                    $episode,
-            );
-            print "Outputting $outputFile\n";
             my $audio = [1];
             if (my $audioTracks = $commentaryTracks->{$startSeason}->{$episode})
             {
@@ -97,7 +89,16 @@ my $series = $tvdb->getSeries($showName) or die("no series($showName): $!");
             $audioLine .= join(',', map { '0' } @$audio );
             $audioLine .= ' ';
 
+            my $outputFile = sprintf(
+                    "%s\\%s - S%02dE%02d%s.mkv",
+                    $outputPath,
+                    $showName,
+                    $startSeason,
+                    $episode,
+                    (scalar @$audio > 1 ? ' [Commentary]' : ''),
+            );
           
+            print "Outputting $outputFile\n";
 
             my $chapters = sprintf('%d-%d', $startChapter, $endChapter);
             $fh->print('  <Job>', "\n");
