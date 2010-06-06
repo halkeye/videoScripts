@@ -4,92 +4,117 @@ use warnings;
 use IO::File;
 use TVDB::API;
 
-my ($showName, $diskPath, $startEp, $startChapter, $endChapter, $title, $outputPath) = @_;
-$showName ||= 'Dragon Ball Kai';
-$outputPath ||= 'E:\tmp';
-$title ||= 25;
-$endChapter ||= 38;
+my ($showName, $startDisc, $endDisc, $startTitle, $discFormat, $discPath, $startEp, $startSeason, $startChapter, $endChapter, $titlesPerDisc, $outputPath) = @_;
+$showName     ||= 'Farscape';
+$outputPath   ||= 'E:\tmp';
 
-#$diskPath ||= 'E:\tmp\kai\FullDisc\DRAGON_BALL_Z_KAI_P1_D1';
-#$startEp ||= 1;
+$startChapter ||= 1;
+$endChapter   ||= 7;
 
-$diskPath ||= 'E:\tmp\kai\FullDisc\DRAGON_BALL_Z_KAI_P1_D2';
-$startEp ||= 8;
+$discFormat   ||= 'E:\tmp\FullDisc\FARSCAPE_S%d_%d';
+$startDisc    ||= 1;
+$endDisc      ||= 6;
+$startSeason  ||= 1;
+$startEp      ||= 1;
+$startTitle   ||= 1;
+$titlesPerDisc ||= 4;
 
 my $saveToDir = "/mnt/tmp";
-
-my $tvdb = TVDB::API::new('4412E34B1A552F29') or die("no tvdb $!");
-my $series = $tvdb->getSeries($showName) or die("no seriesId: $!");
-
 my $jobCount = 0;
 
+my $commentaryTracks = {
+    1 => {
+        1 => 1,
+        2 => 1,
+        3 => 1,
+        4 => 1,
+        5 => 1,
+        6 => 1,
+        9 => 2,
+        14 => 1,
+        16 => 1,
+        19 => 1,
+        21 => 1, 
+        22 => 2,
+    },
+},
+
+Debug::Simple::debuglevels({verbose=>4, debug=>4, test=>4, quiet=>0});
+my $tvdb = TVDB::API::new('4412E34B1A552F29') or die("no tvdb $!");
+print "Looking up $showName\n";
+my $series = $tvdb->getSeries($showName) or die("no series($showName): $!");
+
 {
-    my $fh = IO::File->new("$saveToDir/$showName$startEp.chapterFile", "w");
-    $fh or die("Unable to open file($saveToDir/$showName$startEp.chapterFile) for writing: $!");
-    for (my $chapter = 0; $chapter <= $endChapter;)
+    my $fh = IO::File->new("$saveToDir/$showName.chapterFile", "w");
+    $fh or die("Unable to open file($saveToDir/$showName.chapterFile) for writing: $!");
+    for (my $chapter = $startChapter; $chapter <= $endChapter; $chapter++)
     {
-        $chapter++; # skip recap
-        $fh->print("$chapter, Opening");
-        $chapter++;
-        $fh->print("$chapter, Part A");
-        $chapter++;
-        $fh->print("$chapter, Part B");
-        $chapter++;
-        if ($chapter == 4)
-        {
-            $fh->print("$chapter, Part B");
-            $chapter++;
-        }
-        $fh->print("$chapter, Closing");
-        $chapter++;
-        $fh->print("$chapter, Next Ep Preview");
-        $chapter++;
-        $fh->print("$chapter, Prev Preview");
-        $chapter++;
+        $fh->print("$chapter, Chapter $chapter");
     }
     $fh->close();
 }
 
 {
-    my $fh = IO::File->new("$saveToDir/$showName$startEp.queue", "w");
-    $fh or die("Unable to open file($saveToDir/$showName$startEp.queue) for writing: $!");
+    my $fh = IO::File->new("$saveToDir/$showName-$startSeason.queue", "w");
+    $fh or die("Unable to open file($saveToDir/$showName-$startSeason.queue) for writing: $!");
     $fh->print('<?xml version="1.0"?>', "\n");
     $fh->print('<ArrayOfJob xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">', "\n");
 
-    for (my $chapter = 1; $chapter <= $endChapter; )
+    my $maxEpisode = $tvdb->getMaxEpisode($showName, $startSeason);
+
+    for (my $disc = 1; $disc <= $endDisc;  $disc++)
     {
-        # skip recap 
-        if ($startEp != 1) { $chapter++; }
+        my $discPath = sprintf($discFormat, $startSeason, $disc);
+        print "Processing $disc - $discPath\n";
+        foreach my $episode ((($disc-1)*$titlesPerDisc)+1..(($disc-1)*$titlesPerDisc)+$titlesPerDisc)
+        {
+            my $outputFile = sprintf(
+                    "%s\\%s - S%02dE%02d.mkv",
+                    $outputPath,
+                    $showName,
+                    $startSeason,
+                    $episode,
+            );
+            print "Outputting $outputFile\n";
+            my $audio = [1];
+            if (my $audioTracks = $commentaryTracks->{$startSeason}->{$episode})
+            {
+                foreach (1..$audioTracks)
+                {
+                    push @$audio, $audioTracks+2; # commentary starts at 3
+                }
+            }
+            my $audioLine = '-a ' . join(',', @$audio);
+            $audioLine .= ' -E ';
+            $audioLine .= join(',', map { 'ac3' } @$audio );
+            $audioLine .= ' -6 ';
+            $audioLine .= join(',', map { 'auto' } @$audio );
+            $audioLine .= ' -R ';
+            $audioLine .= join(',', map { 'Auto' } @$audio );
+            $audioLine .= ' -B ';
+            $audioLine .= join(',', map { '32' } @$audio );
+            $audioLine .= ' -D ';
+            $audioLine .= join(',', map { '0' } @$audio );
+            $audioLine .= ' ';
 
-        # Size of episodes. For some reason ep 1 is 4 chapters
-        my $epSize = 3;
-        if ($startEp == 1) { $epSize++; }
+          
 
-        last if $chapter + $epSize > $endChapter;
-        my $showData = $tvdb->getEpisodeAbs($showName, $startEp);
-        my $outputFile = sprintf(
-                "%s\\%s - S%02dE%02d.mkv",
-                $outputPath,
-                $showName,
-                $showData->{'SeasonNumber'},
-                $showData->{'EpisodeNumber'},
-        );
+            my $chapters = sprintf('%d-%d', $startChapter, $endChapter);
+            $fh->print('  <Job>', "\n");
+            $fh->print('    <Id>',$jobCount,'</Id>', "\n");
+            $fh->print('    <Query> -i "',$discPath,'" -t ',($episode % $titlesPerDisc)+1,' --angle 1 -c ',$chapters,
+                                  ' -o "', $outputFile, '" -f mkv --strict-anamorphic  --detelecine --decomb ',
+                                  $audioLine,
+                                  '--subtitle scan --subtitle-forced=Foreign --subtitle-burn=scan --subtitle-default=scan ', 
+                                  '--markers="',"$outputPath\\$showName",'.chapterFile" ',
+                                  '-x mixed-refs=0:8x8dct=1:b-adapt=2 -v 1</Query>', "\n");
+            $fh->print('    <CustomQuery>false</CustomQuery>', "\n");
+            $fh->print('    <Source>',$discPath,'</Source>', "\n");
+            $fh->print('    <Destination>', $outputFile, '</Destination>', "\n");
+            $fh->print('  </Job>', "\n");
 
-        my $chapters = sprintf('%d-%d', $chapter, $chapter+$epSize);
-        print "$chapters\n";
-        $fh->print('  <Job>', "\n");
-        $fh->print('    <Id>',$jobCount,'</Id>', "\n");
-        $fh->print('    <Query> -i "',$diskPath,'" -t ',$title,' --angle 1 -c ',$chapters,' -o "', $outputFile, '" -f mkv --strict-anamorphic  --detelecine --decomb -e x264 -q 20 -a 1,2 -E ac3,ac3 -6 auto,auto -R Auto,Auto -B 32,32 -D 0,0 --subtitle 1 --markers="',"$outputPath/$showName$startEp",'.chapterFile" -x mixed-refs=0:8x8dct=1:b-adapt=2 -v 1</Query>', "\n");
-        $fh->print('    <CustomQuery>false</CustomQuery>', "\n");
-        $fh->print('    <Source>',$diskPath,'</Source>', "\n");
-        $fh->print('    <Destination>', $outputFile, '</Destination>', "\n");
-        $fh->print('  </Job>', "\n");
-
-        $jobCount++;
-        $startEp++;
-
-        $chapter += $epSize+1;
-        $chapter++; # preview
+            $jobCount++;
+        }
     }
     $fh->print('</ArrayOfJob>', "\n");
     $fh->close();
