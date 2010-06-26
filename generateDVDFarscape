@@ -87,7 +87,7 @@ my $series = $tvdb->getSeries($showName) or die("no series($showName): $!");
             $audioLine .= ' -B ';
             $audioLine .= join(',', map { '32' } @$audio );
             $audioLine .= ' -D ';
-            $audioLine .= join(',', map { '0' } @$audio );
+            $audioLine .= join(',', map { '0.0' } @$audio );
             $audioLine .= ' ';
 
             my $outputFile = sprintf(
@@ -108,11 +108,11 @@ my $series = $tvdb->getSeries($showName) or die("no series($showName): $!");
             $fh->print('  <Job>', "\n");
             $fh->print('    <Id>',$jobCount,'</Id>', "\n");
             $fh->print('    <Query> -i "',$discPath,'" -t ',$title,' --angle 1 -c ',$chapters,
-                                  ' -o "', $outputFile, '" -f mkv --strict-anamorphic  --detelecine --decomb ',
+                                  ' -o "', $outputFile, '" -f mkv -w 720 --loose-anamorphic --detelecine --decomb -e x264 -q20',
                                   $audioLine,
                                   '--subtitle scan --subtitle-forced=Foreign --subtitle-burn=scan --subtitle-default=scan ', 
                                   '--markers="',"$outputPath\\$showName",'.chapterFile" ',
-                                  '-x mixed-refs=0:8x8dct=1:b-adapt=2 -v 1</Query>', "\n");
+                                  '-x b-adapt=2:rc-lookahead=50 -v 2</Query>', "\n");
             $fh->print('    <CustomQuery>false</CustomQuery>', "\n");
             $fh->print('    <Source>',$discPath,'</Source>', "\n");
             $fh->print('    <Destination>', $outputFile, '</Destination>', "\n");
