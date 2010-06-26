@@ -20,6 +20,7 @@ foreach my $season (1..$tvdb->getMaxSeason($series))
     {
         my $info = $tvdb->getEpisode($series, $season, $epNum);
         next unless $info->{'EpisodeName'};
+        die "Duplicate named ep - $info->{'EpisodeName'}" if $realEpMap->{$info->{'EpisodeName'}};
 
         $realEpMap->{$info->{'EpisodeName'}} = {
             'epNum' => $info->{'EpisodeNumber'},
@@ -67,6 +68,7 @@ while (my $row = $sth->fetchrow_hashref())
     my $newFileName = sprintf("%s - S%02dE%02d - %s%s", 
             $series, $info->{season}, $info->{epNum}, $row->{epName}, $suffix
     );
+    warn($oldFilename, " /home/halkeye/downloads/MythBusters/$newFileName\n");
     File::Copy::copy($oldFilename, "/home/halkeye/downloads/MythBusters/$newFileName")
         or warn("unable to copy $oldFilename: $!");
 }
